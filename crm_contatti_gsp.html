@@ -57,7 +57,12 @@ select{height:38px;border:1px solid var(--border);border-radius:var(--radius-sm)
 .b-freddo{background:#DBEAFE;color:#1E40AF}
 .b-cliente{background:#D1FAE5;color:#065F46}
 .b-inattivo{background:#F3F4F6;color:#374151}
-.last-ago{font-size:12px;color:var(--text-hint);min-width:60px;text-align:right}
+.last-ago{font-size:12px;color:var(--text-hint);text-align:right}
+.action-date{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.action-ok{background:#D1FAE5;color:#065F46}
+.action-soon{background:#FEF3C7;color:#92400E}
+.action-late{background:#FEE2E2;color:#991B1B}
+.action-none{background:#F3F4F6;color:#A8A49E}
 .chevron{color:var(--text-hint);transition:transform 0.2s;flex-shrink:0}
 .contact-card.open .chevron{transform:rotate(180deg)}
 .card-detail{border-top:1px solid var(--border);padding:16px;display:none}
@@ -167,6 +172,14 @@ select{height:38px;border:1px solid var(--border);border-radius:var(--radius-sm)
       <option value="azienda">Azienda A-Z</option>
       <option value="stato">Stato</option>
     </select>
+    <select id="filterAzione" onchange="render()">
+      <option value="">Tutte le azioni</option>
+      <option value="scaduta">Scadute</option>
+      <option value="oggi">Oggi</option>
+      <option value="settimana">Entro 7 giorni</option>
+      <option value="future">Future</option>
+      <option value="nessuna">Nessuna azione</option>
+    </select>
     <button class="btn-primary" onclick="openModal()">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       Nuovo contatto
@@ -213,6 +226,7 @@ select{height:38px;border:1px solid var(--border);border-radius:var(--radius-sm)
         <div class="form-row"><label>Email</label><input id="fEmail" type="email" placeholder="mario@acme.it" autocomplete="off"></div>
         <div class="form-row"><label>Telefono</label><input id="fTel" type="text" placeholder="+39 02 ..." autocomplete="off"></div>
         <div class="form-row form-full"><label>Note</label><textarea id="fNote" placeholder="Interesse principale, contesto, prossimo step..."></textarea></div>
+        <div class="form-row form-full"><label>Prossima azione (data)</label><input id="fAzione" type="date"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -348,14 +362,37 @@ function debouncedSave() {
   saveTimer = setTimeout(saveToCloud, 800);
 }
 
+function actionBadge(iso) {
+  if (!iso) return '<span class="action-date action-none">nessuna azione</span>';
+  var d = Math.floor((new Date(iso) - Date.now()) / 86400000);
+  if (d < 0) return '<span class="action-date action-late">scaduta: ' + formatDate(iso) + '</span>';
+  if (d === 0) return '<span class="action-date action-soon">oggi</span>';
+  if (d <= 7) return '<span class="action-date action-soon">tra ' + d + 'g &mdash; ' + formatDate(iso) + '</span>';
+  return '<span class="action-date action-ok">' + formatDate(iso) + '</span>';
+}
+
 function render() {
   var q = (document.getElementById('searchInput').value||'').toLowerCase();
   var fs = document.getElementById('filterStato').value;
   var sort = document.getElementById('sortBy').value;
 
+  var fa = document.getElementById('filterAzione').value;
   var list = contacts.filter(function(c) {
     var hay = (c.nome+' '+c.cognome+' '+(c.azienda||'')+' '+(c.ruolo||'')).toLowerCase();
-    return hay.indexOf(q) >= 0 && (!fs || c.stato === fs);
+    if (hay.indexOf(q) < 0) return false;
+    if (fs && c.stato !== fs) return false;
+    if (fa) {
+      var az = c.prossima_azione;
+      var d = az ? Math.floor((new Date(az) - Date.now()) / 86400000) : null;
+      if (fa === 'nessuna' && az) return false;
+      if (fa === 'nessuna' && !az) return true;
+      if (!az) return false;
+      if (fa === 'scaduta' && d >= 0) return false;
+      if (fa === 'oggi' && d !== 0) return false;
+      if (fa === 'settimana' && (d < 0 || d > 7)) return false;
+      if (fa === 'future' && d <= 7) return false;
+    }
+    return true;
   });
   list.sort(function(a, b) {
     if (sort==='nome') return (a.nome+a.cognome).localeCompare(b.nome+b.cognome,'it');
@@ -417,6 +454,7 @@ function render() {
     var fields = '';
     if (c.email) fields += '<div class="form-row"><div class="df-label">Email</div><div class="df-val"><a href="mailto:'+escHtml(c.email)+'">'+escHtml(c.email)+'</a></div></div>';
     if (c.tel) fields += '<div class="form-row"><div class="df-label">Telefono</div><div class="df-val"><a href="tel:'+escHtml(c.tel)+'">'+escHtml(c.tel)+'</a></div></div>';
+    if (c.prossima_azione) fields += '<div class="form-row"><div class="df-label">Prossima azione</div><div class="df-val">'+actionBadge(c.prossima_azione)+'</div></div>';
     if (c.note) fields += '<div class="form-row form-full"><div class="df-label">Note</div><div class="df-note">'+escHtml(c.note)+'</div></div>';
 
     html +=
@@ -429,6 +467,7 @@ function render() {
           '</div>'+
           '<div class="card-right">'+
             '<span class="badge '+badgeClass(c.stato)+'">'+badgeLabel(c.stato)+'</span>'+
+            actionBadge(c.prossima_azione)+
             (ult?'<span class="last-ago">'+daysSince(ult.data)+'</span>':'<span class="last-ago" style="color:var(--text-hint)">-</span>')+
             '<svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>'+
           '</div>'+
@@ -484,9 +523,10 @@ function openModal(id) {
     document.getElementById('fEmail').value = c.email||'';
     document.getElementById('fTel').value = c.tel||'';
     document.getElementById('fNote').value = c.note||'';
+    document.getElementById('fAzione').value = c.prossima_azione||'';
   } else {
     document.getElementById('modalTitle').textContent = 'Nuovo contatto';
-    var ids = ['fNome','fCognome','fAzienda','fRuolo','fEmail','fTel','fNote'];
+    var ids = ['fNome','fCognome','fAzienda','fRuolo','fEmail','fTel','fNote','fAzione'];
     for (var j=0;j<ids.length;j++) document.getElementById(ids[j]).value='';
     document.getElementById('fStato').value = 'tiepido';
   }
@@ -506,7 +546,8 @@ function saveContact() {
     stato:document.getElementById('fStato').value,
     email:document.getElementById('fEmail').value.trim(),
     tel:document.getElementById('fTel').value.trim(),
-    note:document.getElementById('fNote').value.trim()
+    note:document.getElementById('fNote').value.trim(),
+    prossima_azione:document.getElementById('fAzione').value||''
   };
   if (editingId) {
     for (var i=0;i<contacts.length;i++) { if(contacts[i].id===editingId){ contacts[i]=Object.assign(contacts[i],data); break; } }
