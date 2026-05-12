@@ -554,6 +554,8 @@ function parseCSVLine(line, sep) {
 function detectSep(line) {
   var commas = (line.match(/,/g)||[]).length;
   var semicolons = (line.match(/;/g)||[]).length;
+  var tabs = (line.match(/	/g)||[]).length;
+  if (tabs > commas && tabs > semicolons) return '	';
   return semicolons > commas ? ';' : ',';
 }
 
@@ -567,12 +569,15 @@ function importCSV(event) {
     var sep = detectSep(lines[0]);
     var headers = parseCSVLine(lines[0], sep).map(function(h){ return h.toLowerCase().trim(); });
     var fieldMap = {
-      nome: ['first name','nome','firstname','given name','name'],
-      cognome: ['last name','cognome','lastname','surname','family name'],
+      nome: ['first name','nome','firstname','given name','name','nome cliente'],
+      cognome: ['last name','cognome','lastname','surname','family name','cognome cliente'],
       email: ['email','e-mail','email address','posta elettronica','indirizzo e-mail','indirizzo email'],
-      tel: ['mobile phone','business phone','home phone','telefono','phone','mobile','cell','cellulare','tel','telefono cellulare','telefono ufficio'],
+      tel: ['telefono fisso','mobile phone','business phone','home phone','telefono','phone','mobile','tel'],
+      cellulare: ['cellulare','cell','mobile phone','telefono cellulare'],
       azienda: ['company','azienda','organization','company name','societa','ragione sociale'],
-      ruolo: ['job title','ruolo','title','position','function','qualifica','mansione']
+      ruolo: ['job title','ruolo','title','position','function','qualifica','mansione','ruolo / funzione','ruolo/funzione'],
+      note: ['note','notes','commenti','memo'],
+      ultimocontatto: ['ultimo contatto','last contact','data contatto']
     };
     var cols = {};
     var fields = Object.keys(fieldMap);
@@ -587,7 +592,7 @@ function importCSV(event) {
     var added = 0, skipped = 0;
     for (var i = 1; i < lines.length; i++) {
       var cells = parseCSVLine(lines[i], sep);
-      function get(fi) { return fi >= 0 && cells[fi] ? cells[fi].trim() : ''; }
+      var get = function(fi) { return fi >= 0 && cells[fi] ? cells[fi].trim() : ''; };
       var nome = get(cols.nome);
       var cognome = get(cols.cognome);
       if (!nome && !cognome) { skipped++; continue; }
@@ -599,10 +604,17 @@ function importCSV(event) {
         }
       }
       if (exists) { skipped++; continue; }
+      var tel = get(cols.tel) || get(cols.cellulare);
+      var noteVal = get(cols.note);
+      var logEntries = [];
+      var ultContatto = get(cols.ultimocontatto);
+      if (ultContatto) {
+        logEntries.push({id: nextLogId++, data: todayISO(), tipo: 'nota', testo: 'Ultimo contatto: ' + ultContatto});
+      }
       contacts.unshift({
         id: nextId++, nome: nome||'?', cognome: cognome||'',
         azienda: get(cols.azienda), ruolo: get(cols.ruolo),
-        email: email, tel: get(cols.tel), stato: 'tiepido', note: '', log: []
+        email: email, tel: tel, stato: 'tiepido', note: noteVal, log: logEntries
       });
       added++;
     }
