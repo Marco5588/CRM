@@ -539,16 +539,22 @@ function addLog(cid) {
   showToast('Contatto registrato');
 }
 
-function parseCSVLine(line) {
+function parseCSVLine(line, sep) {
   var result = [], cur = '', inQ = false;
   for (var i = 0; i < line.length; i++) {
     var ch = line[i];
     if (ch === '"') { inQ = !inQ; }
-    else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+    else if (ch === sep && !inQ) { result.push(cur); cur = ''; }
     else cur += ch;
   }
   result.push(cur);
   return result.map(function(s){ return s.replace(/^"|"$/g,'').trim(); });
+}
+
+function detectSep(line) {
+  var commas = (line.match(/,/g)||[]).length;
+  var semicolons = (line.match(/;/g)||[]).length;
+  return semicolons > commas ? ';' : ',';
 }
 
 function importCSV(event) {
@@ -558,14 +564,15 @@ function importCSV(event) {
   reader.onload = function(e) {
     var lines = e.target.result.split(/\r?\n/).filter(function(l){ return l.trim(); });
     if (lines.length < 2) { showToast('File CSV vuoto o non valido'); return; }
-    var headers = parseCSVLine(lines[0]).map(function(h){ return h.toLowerCase().trim(); });
+    var sep = detectSep(lines[0]);
+    var headers = parseCSVLine(lines[0], sep).map(function(h){ return h.toLowerCase().trim(); });
     var fieldMap = {
-      nome: ['first name','nome','firstname','given name'],
+      nome: ['first name','nome','firstname','given name','name'],
       cognome: ['last name','cognome','lastname','surname','family name'],
-      email: ['email','e-mail','email address','posta elettronica'],
-      tel: ['mobile phone','business phone','home phone','telefono','phone','mobile','cell'],
-      azienda: ['company','azienda','organization','company name'],
-      ruolo: ['job title','ruolo','title','position','function']
+      email: ['email','e-mail','email address','posta elettronica','indirizzo e-mail','indirizzo email'],
+      tel: ['mobile phone','business phone','home phone','telefono','phone','mobile','cell','cellulare','tel','telefono cellulare','telefono ufficio'],
+      azienda: ['company','azienda','organization','company name','societa','ragione sociale'],
+      ruolo: ['job title','ruolo','title','position','function','qualifica','mansione']
     };
     var cols = {};
     var fields = Object.keys(fieldMap);
@@ -579,7 +586,7 @@ function importCSV(event) {
     }
     var added = 0, skipped = 0;
     for (var i = 1; i < lines.length; i++) {
-      var cells = parseCSVLine(lines[i]);
+      var cells = parseCSVLine(lines[i], sep);
       function get(fi) { return fi >= 0 && cells[fi] ? cells[fi].trim() : ''; }
       var nome = get(cols.nome);
       var cognome = get(cols.cognome);
