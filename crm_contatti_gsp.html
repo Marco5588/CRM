@@ -394,7 +394,14 @@ function render() {
     }
     return true;
   });
+  // Se c'è filtro azione attivo, ordina sempre per data azione
+  var fa = document.getElementById('filterAzione') ? document.getElementById('filterAzione').value : '';
   list.sort(function(a, b) {
+    if (fa && fa !== 'nessuna') {
+      var da = a.prossima_azione || '9999-99-99';
+      var db = b.prossima_azione || '9999-99-99';
+      return da.localeCompare(db);
+    }
     if (sort==='nome') return (a.nome+a.cognome).localeCompare(b.nome+b.cognome,'it');
     if (sort==='azienda') return (a.azienda||'ZZZ').localeCompare(b.azienda||'ZZZ','it');
     if (sort==='stato') return (STATUS_ORDER[a.stato]||9)-(STATUS_ORDER[b.stato]||9);
