@@ -171,6 +171,7 @@ select{height:38px;border:1px solid var(--border);border-radius:var(--radius-sm)
       <option value="nome">Nome A-Z</option>
       <option value="azienda">Azienda A-Z</option>
       <option value="stato">Stato</option>
+      <option value="azione">Prossima azione</option>
     </select>
     <select id="filterAzione" onchange="render()">
       <option value="">Tutte le azioni</option>
@@ -397,14 +398,14 @@ function render() {
   // Se c'è filtro azione attivo, ordina sempre per data azione
   var fa = document.getElementById('filterAzione') ? document.getElementById('filterAzione').value : '';
   list.sort(function(a, b) {
-    if (fa && fa !== 'nessuna') {
-      var da = a.prossima_azione || '9999-99-99';
-      var db = b.prossima_azione || '9999-99-99';
-      return da.localeCompare(db);
-    }
     if (sort==='nome') return (a.nome+a.cognome).localeCompare(b.nome+b.cognome,'it');
     if (sort==='azienda') return (a.azienda||'ZZZ').localeCompare(b.azienda||'ZZZ','it');
     if (sort==='stato') return (STATUS_ORDER[a.stato]||9)-(STATUS_ORDER[b.stato]||9);
+    if (sort==='azione') {
+      var da = (a.prossima_azione && a.prossima_azione !== '') ? a.prossima_azione : '9999-99-99';
+      var db = (b.prossima_azione && b.prossima_azione !== '') ? b.prossima_azione : '9999-99-99';
+      return da.localeCompare(db);
+    }
     var la = a.log[0]?a.log[0].data:'0000';
     var lb = b.log[0]?b.log[0].data:'0000';
     return lb.localeCompare(la);
